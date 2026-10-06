@@ -465,7 +465,7 @@ class OKLCHPalette(ColorPalette):
         return color.to_oklch()
 
     @classmethod
-    def new_random(cls, num_colors, min_luma=0, max_luma=1, min_chroma=0, max_chroma=1):
+    def new_random(cls, num_colors, min_luma=0.4, max_luma=0.85, min_chroma=0.05, max_chroma=0.6):
         rng = np.random.default_rng()
         hue       = rng.uniform(0.0, 360.0, num_colors)
         lightness = rng.uniform(min_luma,   max_luma,   num_colors)
@@ -581,7 +581,7 @@ class OKLCHPalette(ColorPalette):
         ''' just an alias for adjust_chroma '''
         return self.adjust_chroma(x)
 
-    def whiten(self, t:float):
+    def __whiten(self, t:float):
         ''' fades to white: increases luma, reduces saturation, leaves hue as is '''
         def fn(lch):
             luma   = Color.lerp_float(lch[0],1.0,t)
@@ -589,19 +589,45 @@ class OKLCHPalette(ColorPalette):
             return(luma,chroma,lch[2])
         return OKLCHPalette(self.map(fn))
 
+    def __blacken(self, t:float):
+        ''' fades to black: decreases luma, reduces saturation, leaves hue as is '''
+        def fn(lch):
+            luma   = Color.lerp_float(lch[0],0.0,t)
+            chroma = Color.lerp_float(lch[1],0.0,t)
+            return(luma,chroma,lch[2])
+        return OKLCHPalette(self.map(fn))
+
+    def fade(self, t:float):
+        ''' takes a float [-1,1] and interpolates from black over neutral to white'''
+        if t>0:
+            return self.__whiten(t)
+        elif t<0:
+            return self.__blacken(-t)
+        else:
+            return self
+
+    def fade_adaptive(self, t:float):
+        ''' takes a float [0,1] and darkens bright colors and whitens darker ones '''
+        luma = self.get_luma()
+        if luma < 0.5:
+            return self.__whiten(t)
+        else:
+            return self.__blacken(t)
+
 
 
 
     # the harmonic functions
-    # undecided if the functions should return the input color
+    # they never return the base colors (except analogous on uneven step number)
+
+    ################################
     def complement(self):
         return self.shift_hue(-180)
 
 
-    def triadic(self, keep_input=True):
+    def triadic(self):
         a =  self.shift_hue(120)
         b =  self.shift_hue(-120)
-        if keep_input: return self.join(a.join(b))
         return a.join(b)
 
     def square(self):
@@ -609,7 +635,7 @@ class OKLCHPalette(ColorPalette):
         a =  self.shift_hue(90)
         b =  self.shift_hue(180)
         c =  self.shift_hue(270)
-        return self.join(a,b,c)
+        return a.join(b,c)
 
     def analogous(self, num=5, stepsize=20):
         self = self.shift_hue(float(num)/2.0*-stepsize)
@@ -625,12 +651,27 @@ class OKLCHPalette(ColorPalette):
         return compl.analogous(2,spread)
 
 
+    def compound(self,spread=40, bias=0):
+        ''' the weird K-shaped one with a complement and two analogues that are shifted towards each other '''
+        root_v1  = self.shift_hue(spread)
+
+        compl    = self.complement().shift_hue(bias)
+        compl_v1 = compl.shift_hue(-spread)
+        return root_v1.join(compl,compl_v1)
+
+
+
+
+
+
     # not sure id ever need this
     #def shift_chroma(self,offset):
     #    fn = lambda color: (color[0], min(1,max(0,color[1])) + offset, color[2])
     #    return OKLCHPalette(self.map(fn))
 
 
+
+    # deprecated since analogous with 2 does the same
     def split(self, angle=20):
         x = [self.__split(x,angle) for x in self.colors]
         return OKLCHPalette(np.array(x).reshape((-1,3)))

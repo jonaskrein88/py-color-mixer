@@ -123,12 +123,12 @@ def example_triadic():
 	root = OKLCHPalette.new_random(1)
 
 	triad = root.triadic()
-	c4 = triad[0].whiten(0.75) 
-	c5 = triad[1].whiten(0.9) 
+	c4 = triad[0].fade(0.75) 
+	c5 = triad[1].fade(0.9) 
 
 	colors = triad.join(c4,c5)
 	pretty_preview(colors, "images/triadic_00.jpg")
-	mxr.plot_colors_oklch(colors, out_file="images/triadic_disc_00.png")
+	mxr.plot_colors_oklch(colors, out_file="images/triadic_00_wheel.png")
 	#mxr.plot_XYY([colors])
 
 
@@ -137,32 +137,62 @@ def example_triadic():
 
 
 def example_split_complementary():
-	''' create a small color based on a split complementary harmony '''
 
 	root = OKLCHPalette.new_random(1)
 	split = root.split_complement(bias=10)
 	a = split[0]
 	b = split[1].exposure(1.125)
-	c = b.whiten(0.75)
-	d = root.whiten(0.7)
+	c = b.fade(0.75)
+	d = root.fade(0.7)
 
 	final = root.join(a,b,c,d)
 	final = final.make_srgb_safe()
 	pretty_preview(final, "images/split_complement_00.jpg")
-	mxr.plot_colors_on_disc(final,out_file="images/split_complement_disc_00.png")
+	mxr.plot_colors_oklch(final,out_file="images/split_complement_00_wheel.png")
 	#mxr.plot_XYY([colors])
 
 
 
+def example_square():
+
+	root = OKLCHPalette.new_random(1)
+	square = root.square()
+	c5 = square[0].fade_adaptive(0.5) 
+
+	colors = root.join(square,c5)
+	#colors = colors.make_srgb_safe()
+	pretty_preview(colors, "images/square_00.jpg")
+	mxr.plot_colors_oklch(colors, out_file="images/square_00_wheel.png")
 
 
+def example_analogous():
+
+	root = OKLCHPalette.new_random(1)
+	colors = root.analogous()
+	#colors = colors.make_srgb_safe()
+	pretty_preview(colors, "images/analogous_00.jpg")
+	mxr.plot_colors_oklch(colors, out_file="images/analogous_00_wheel.png")
+
+
+def example_compound():
+
+	root = OKLCHPalette.new_random(1)
+	compound = root.compound()
+	c5     = root.fade(0.5)
+	colors = root.join(compound,c5)
+	#colors = colors.make_srgb_safe()
+	pretty_preview(colors, "images/compound_00.jpg")
+	mxr.plot_colors_oklch(colors, out_file="images/compound_00_wheel.png")
 
 
 
 #example_smooth_luma_00()
 #example_smooth_luma_01()
 #example_split_complementary()
-example_triadic()
+#example_triadic()
+#example_square()
+#example_analogous()
+example_compound()
 
 
 
