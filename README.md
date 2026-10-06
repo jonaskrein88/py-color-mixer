@@ -7,7 +7,10 @@ It is mostly build around the [OKLCH](https://oklch.com) color space to create p
 
 The palettes are built on Numpy and all operations work on whole color palettes. Even single colors are implemented as color palettes.
 
-![example](images/smooth_palette_02.jpg)
+Example of a palette based on a biased split-complementary with a brighter variants of the root and one of the splits:
+![example](images/split_complement_02.jpg)
+![example](images/split_complement_disc_02.png)
+
 
 OKLCH is designed to maintain a consistent perceived brightness. So it is quite easy to remap random colors to have a linear gradient.
 Example from my [Unity dithering project](https://www.artstation.com/artwork/dyA5g3):
