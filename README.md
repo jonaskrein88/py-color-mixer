@@ -7,9 +7,13 @@ It is mostly build around the [OKLCH](https://oklch.com) color space to create p
 
 The palettes are built on Numpy and all operations work on whole color palettes. Even single colors are implemented as color palettes.
 
-Example of a palette based on a biased split-complementary with a brighter variants of the root and one of the splits:
-![example](images/split_complement_02.jpg)
-![example](images/split_complement_disc_02.png)
+Example palette based on a triadic harmony with two lighter variant colors:
+![example](images/triadic_04.jpg)
+![example](images/triadic_04_wheel.png)
+
+Example palette based on a tetradic (square) harmony with one darker variant color:
+![example](images/square_00.jpg)
+![example](images/square_00_wheel.png)
 
 
 OKLCH is designed to maintain a consistent perceived brightness. So it is quite easy to remap random colors to have a linear gradient.
