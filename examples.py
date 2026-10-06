@@ -13,8 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 # little preview image with hex codes
-# TODO add label
-def pretty_preview(palette, out_file=None, show=True):
+def pretty_preview(palette, out_file=None, show=True, title=None, sub_title=None):
 
 	num_colors = len(palette)
 	column_width = 200
@@ -24,12 +23,12 @@ def pretty_preview(palette, out_file=None, show=True):
 	img = Image.new("RGB", (image_width, image_height), "#FFFFFF")
 	draw = ImageDraw.Draw(img)
 
-
 	try:
 	    font_hex = ImageFont.truetype("arialbd.ttf", 24)
+	    font_title = ImageFont.truetype("arialbd.ttf", 32)
 	except IOError:
 	    font_hex = ImageFont.load_default()
-	    font_name = ImageFont.load_default()
+	    font_title = ImageFont.load_default()
 
 	hexes = palette.to_srgb().to_hex()
 	lumas = palette.luma()
@@ -41,12 +40,22 @@ def pretty_preview(palette, out_file=None, show=True):
 	    
 	    draw.rectangle([x_start, 0, x_end, image_height], fill=colorHex)
 	    
-	    hex_text = colorHex.replace("#", "").upper()
+	    hex_text = colorHex#.replace("#", "").upper()
 	    hex_text_x = x_start + (column_width - draw.textlength(hex_text, font=font_hex)) / 2
 
-	    text_color = '#dddddd' if lumas[i]<0.5 else '#444444'
+	    text_color = '#eeeeee' if lumas[i]<0.5 else '#444444'
 
 	    draw.text((hex_text_x, image_height - 70), hex_text, fill=text_color, font=font_hex)
+
+	if title:
+	    title_color = '#ffffff'
+	    title_x = image_width/2 - draw.textlength(title, font=font_title) / 2
+	    draw.text((title_x, 30), title, fill=title_color, font=font_title)
+
+	if sub_title:
+	    title_color = '#ffffff'
+	    title_x = image_width/2 - draw.textlength(sub_title, font=font_hex) / 2
+	    draw.text((title_x, 72), sub_title, fill=title_color, font=font_hex)
 
 	if out_file:
 		img.save(out_file)
@@ -81,10 +90,10 @@ def example_smooth_luma_00():
 
 	final = mxr.OKLCHPalette.from_channels(lightness, chroma, hue)
 
-	final = final.make_safe_chroma()
+	final = final.make_srgb_safe()
 	rgb = final.to_srgb().clamp()
 	mxr.plot_XYY([rgb])
-	pretty_preview(rgb,"images/smooth_palette_00.jpg")
+	pretty_preview(rgb,"images/smooth_palette_00.jpg", title="Test Smooth Luma")
 
 
 
@@ -119,6 +128,7 @@ def example_triadic():
 
 	colors = triad.join(c4,c5)
 	pretty_preview(colors, "images/triadic_00.jpg")
+	mxr.plot_colors_oklch(colors, out_file="images/triadic_disc_00.png")
 	#mxr.plot_XYY([colors])
 
 
@@ -139,6 +149,7 @@ def example_split_complementary():
 	final = root.join(a,b,c,d)
 	final = final.make_srgb_safe()
 	pretty_preview(final, "images/split_complement_00.jpg")
+	mxr.plot_colors_on_disc(final,out_file="images/split_complement_disc_00.png")
 	#mxr.plot_XYY([colors])
 
 
@@ -152,6 +163,7 @@ def example_split_complementary():
 #example_smooth_luma_01()
 #example_split_complementary()
 example_triadic()
+
 
 
 

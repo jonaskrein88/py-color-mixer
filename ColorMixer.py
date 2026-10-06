@@ -1,8 +1,13 @@
 
 import matplotlib
 import matplotlib.pyplot as plt
+#import matplotlib.colors as mcolors
+import matplotlib.patches as patches
+
+
 import math
 import numpy as np
+
 
 
 
@@ -224,11 +229,15 @@ class ColorPalette:
         color_tuple = self.colors[index]
         return self._as_self(np.array([color_tuple]))
 
-    def __iter__(self):
-        return iter(self.colors)
+    #def __iter__(self):
+        #return self
 
     def __len__(self):
         return self.colors.shape[0]
+
+    def get_color_as_tuple(self, index=0):
+        ''' return color as raw tuple '''
+        return self.colors[index]
 
     @classmethod
     def from_color(cls,color):
@@ -415,7 +424,8 @@ class RGBPalette(ColorPalette):
         return OKLABPalette(self.map(Color.rgb_to_oklab))
 
     def to_hsv(self):
-        return HSVPalette(self.map(Color.rgb_to_hsv))
+        ''' clamping to 0-1 otherwise hsv bugs out '''
+        return HSVPalette(self.clamp().map(Color.rgb_to_hsv))
 
     def to_srgb(self):
         return SRGBPalette(self.map(Color.linear_rgb_to_srgb))
@@ -471,6 +481,9 @@ class OKLCHPalette(ColorPalette):
 
     def to_rgb(self):
         return RGBPalette(self.map(Color.oklch_to_rgb))
+
+    def to_hsv(self):
+        return self.to_rgb().to_hsv()
 
     def to_srgb(self):
         return self.to_rgb().to_srgb()
@@ -674,7 +687,8 @@ class HSVPalette(ColorPalette):
     def to_hex(self):
         return self.to_srgb().to_hex()
 
-
+    def clamp(self):
+        raise NotImplementedError
 
 
 
@@ -733,6 +747,178 @@ def plot_XYY(palettes):
 
 
     plt.show()
+
+
+
+
+def plot_colors_hsv(palette, out_file=None):
+    grid_size = 800 
+    x = np.linspace(-1, 1, grid_size)
+    y = np.linspace(-1, 1, grid_size)
+    X, Y = np.meshgrid(x, y)
+
+    radius = np.sqrt(X**2 + Y**2)
+    theta = np.arctan2(Y, X)
+
+    R_wave = (np.cos(theta) + 1) / 2
+    G_wave = (np.cos(theta - 2 * np.pi / 3) + 1) / 2
+    B_wave = (np.cos(theta + 2 * np.pi / 3) + 1) / 2
+
+    # fade saturation
+    sat_factor = np.clip(radius, 0, 1)
+
+    R = 1.0 - sat_factor * (1.0 - R_wave)
+    G = 1.0 - sat_factor * (1.0 - G_wave)
+    B = 1.0 - sat_factor * (1.0 - B_wave)
+
+    rgb_img = np.dstack((R, G, B))
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    im = ax.imshow(rgb_img, extent=[-1, 1, -1, 1], origin='lower', interpolation='bicubic')
+
+    # clip to disk
+    circle_mask = patches.Circle((0, 0), radius=1.0, transform=ax.transData)
+    im.set_clip_path(circle_mask)
+
+
+    # note: palette atm only implements getitem not iter/next
+    for color in palette:
+        hsv = color.to_hsv().get_color_as_tuple()
+        rgb = color.to_srgb().clamp().get_color_as_tuple()
+        #print(hsv)
+        #print(rgb)
+
+        
+        dot_theta = hsv[0] * 2 * np.pi
+        dot_radius = hsv[1]
+        
+        dot_x = dot_radius * np.cos(dot_theta)
+        dot_y = dot_radius * np.sin(dot_theta)
+        
+        ax.scatter(
+            dot_x, dot_y, 
+            color=[rgb],
+            edgecolors='white', 
+            linewidths=2.0, 
+            s=150, 
+            zorder=5
+        )
+
+    ax.set_xlim(-1.05, 1.05)
+    ax.set_ylim(-1.05, 1.05)
+    ax.axis('off')
+
+    if out_file:
+        plt.savefig(
+            out_file,
+            bbox_inches='tight',
+            pad_inches=0,
+            transparent=True,
+            dpi=300
+        )
+
+    plt.show()
+
+
+
+
+
+def plot_colors_oklch(palette, out_file=None):
+
+    def oklch_to_rgb_vectorized(L_array, C_array, H_array):
+        scalar_converter = lambda l, c, h: Color.oklch_to_rgb((l, c, h))
+        vectorized_func = np.vectorize(scalar_converter)
+        R_grid, G_grid, B_grid = vectorized_func(L_array, C_array, H_array)
+        return np.dstack((R_grid, G_grid, B_grid)).astype(float)
+
+
+    grid_size = 800 
+    x = np.linspace(-1, 1, grid_size)
+    y = np.linspace(-1, 1, grid_size)
+    X, Y = np.meshgrid(x, y)
+
+    c_val = np.sqrt(X**2 + Y**2)
+    h_val = np.arctan2(Y, X)
+    
+    h_val_deg = np.degrees(np.mod(h_val, 2 * np.pi))
+    
+    MAX_CHROMA = 0.25 # supposed to be 0.32 but it looks a bit to harsh
+
+    bg_h = h_val_deg
+    bg_c = np.clip(c_val, 0, 1) * MAX_CHROMA
+    # fade to the center
+    bg_l = 0.85 + (1.0 - np.clip(c_val, 0, 1)) * 0.15
+
+
+    # batch convert
+    rgb_img = oklch_to_rgb_vectorized(bg_l, bg_c, bg_h)
+    rgb_img = np.clip(rgb_img, 0.0, 1.0)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    im = ax.imshow(rgb_img, extent=[-1, 1, -1, 1], origin='lower', interpolation='bicubic')
+
+    # clip to disc
+    circle_mask = patches.Circle((0, 0), radius=1.0, transform=ax.transData)
+    im.set_clip_path(circle_mask)
+
+
+
+
+    # note: palette atm only implements getitem not iter/next
+    for color in palette:
+        
+        oklch = color.to_oklch().get_color_as_tuple()
+        rgb   = color.to_srgb().clamp().get_color_as_tuple()
+        
+        l, c, h = oklch
+        
+        dot_theta  = np.radians(h)
+        dot_radius = np.clip(c / MAX_CHROMA, 0.0, 1.0)
+
+        dot_x = dot_radius * np.cos(dot_theta)
+        dot_y = dot_radius * np.sin(dot_theta)
+        
+        ax.scatter(
+            dot_x, dot_y, 
+            color=[rgb],
+            edgecolors='white', 
+            linewidths=2.0, 
+            s=150, 
+        )
+
+    ax.set_xlim(-1.05, 1.05)
+    ax.set_ylim(-1.05, 1.05)
+    ax.axis('off')
+
+    if out_file:
+        plt.savefig(
+            out_file,
+            bbox_inches='tight',
+            pad_inches=0,
+            transparent=True,
+            dpi=300
+        )
+
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
