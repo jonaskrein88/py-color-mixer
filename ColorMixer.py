@@ -3,12 +3,18 @@ import matplotlib
 import matplotlib.pyplot as plt
 #import matplotlib.colors as mcolors
 import matplotlib.patches as patches
-
+from enum import Enum, unique
 
 import math
 import numpy as np
 
 
+class Role(Enum):
+    DEEP_BASE = 0
+    MID_SUPPORT = 1
+    SECOND_ACCENT = 2
+    HERO_ACCENT = 3
+    HIGHLIGHT = 4
 
 
 
@@ -151,10 +157,14 @@ class Color:
         return (f(r), f(g), f(b))
 
     @staticmethod
-    def rgb_to_luma(rgb):
+    def rgb_to_physical_luma(rgb):
         r, g, b = rgb
         l = (0.2126 * r) + (0.7152 * g) + (0.0722 * b)
         return l
+
+    @classmethod
+    def rgb_to_perceived_luma(cls,rgb):
+        return cls.rgb_to_physical_luma(rgb) ** (1/3)
 
     @staticmethod
     def clamp(rgb):
@@ -249,19 +259,26 @@ class ColorPalette:
         ''' wraps the color array in the current class '''
         return cls(colors)
 
-    def luma(self):
+    @classmethod
+    def merge(cls,*palettes):
+        ''' constructs a new joined palette from palettes'''
+        colors = [cls.from_color(p).colors for p in palettes]
+        out = np.array(colors).reshape(-1,3)
+        return cls._as_self(out)
+
+
+    def luma_physical(self):
         rgb = self.to_rgb()
-        return [Color.rgb_to_luma(x) for x in rgb.colors]
+        return [Color.rgb_to_physical_luma(x) for x in rgb.colors]
+
+    def luma_perceptual(self):
+        rgb = self.to_rgb()
+        return [Color.rgb_to_perceived_luma(x) for x in rgb.colors]
 
     @classmethod
     def from_channels(cls, a, b=None, c=None, name=None):
         abc = np.stack((a, b, c)).T
         return cls(abc, name=name)
-
-    @classmethod
-    def from_channel(cls, channel):
-        ''' needs to be implemented by the color models individually '''
-        raise NotImplementedError
 
     def channel_mix(self, other, index):
         ''' copies channel of color a and pastes it at the same index in color b'''
@@ -286,9 +303,15 @@ class ColorPalette:
         return self._as_self(colors)
 
 
-    def sort(self, fn):
-        raise NotImplementedError
-        # TODO
+    def sort_brightness(self):
+        indices = np.argsort(self.luma_perceptual())
+        colors = self.colors[indices]
+        return self._as_self(colors)
+
+
+
+
+
 
 
     @classmethod
@@ -332,6 +355,7 @@ class ColorPalette:
         current_class = type(self)
         return current_class(interpolated_colors)
 
+
     def map(self, fn):
         '''
         utility function to map a function over the colors.
@@ -339,9 +363,21 @@ class ColorPalette:
         '''
         return np.array([fn(x) for x in self.colors])
 
+    def _map2(self, values, fn):
+        '''
+        maps a function over the colors with the second parameter being a sequence
+        ie. exposure( (1,0.5,0.25) )
+        If the second value is a scalar we convert it to a list
 
+        '''
+        if not hasattr(values, '__iter__'):
+            values = [values] * len(self.colors)
 
+        if len(values) != len(self.colors):
+            raise ValueError("Trying to map values over color sequence with a different size")
 
+        colors = [fn(self.colors[i], values[i]) for i in range(len(self.colors))]
+        return self._as_self(np.array(colors))
 
 
 
@@ -465,8 +501,8 @@ class OKLCHPalette(ColorPalette):
         return color.to_oklch()
 
     @classmethod
-    def new_random(cls, num_colors, min_luma=0.4, max_luma=0.85, min_chroma=0.05, max_chroma=0.6):
-        rng = np.random.default_rng()
+    def new_random(cls, num_colors, seed=None, min_luma=0.6, max_luma=0.75, min_chroma=0.2, max_chroma=0.27):
+        rng = np.random.default_rng(seed)
         hue       = rng.uniform(0.0, 360.0, num_colors)
         lightness = rng.uniform(min_luma,   max_luma,   num_colors)
         chroma    = rng.uniform(min_chroma, max_chroma, num_colors)
@@ -491,7 +527,7 @@ class OKLCHPalette(ColorPalette):
     def to_hex(self):
         return self.to_srgb().to_hex()
 
-    def get_luma(self):
+    def get_lightness(self):
         return self.get_channel(0)
 
     def get_chroma(self):
@@ -504,10 +540,12 @@ class OKLCHPalette(ColorPalette):
         return self.get_channel(2)/360.0
 
 
-    # doesn't guarantee valid srgb results, so kinda pointless
-    '''
-    def make_safe_chroma(self):    
-        lightness = self.get_luma()
+
+
+
+
+    # doesn't guarantee valid srgb results and sets the chroma. very invasive
+        lightness = self.get_lightness()
         max_safe_chroma = np.where(
             lightness <= 0.65,
             lightness * 0.28,           # Dark segment clamp
@@ -515,8 +553,7 @@ class OKLCHPalette(ColorPalette):
         )
         hue = self.get_hue()
         return OKLCHPalette.from_channels(lightness, max_safe_chroma, hue)
-    '''
-
+    
 
     def make_srgb_safe(self):    
         '''
@@ -560,22 +597,55 @@ class OKLCHPalette(ColorPalette):
 
 
 
-
+    # TODO
+    # make these ones take arrays as parameters:
     def shift_hue(self,offset):
         def fn(lch):
             h = (lch[2] + offset) % 360
             return (lch[0], lch[1], h)
         return OKLCHPalette(self.map(fn))
 
-    def exposure(self, x):
-        ''' multiply luma by x '''
-        colors = self.map(lambda c : (c[0]*x,c[1],c[2]))
-        return OKLCHPalette(colors)
 
-    def adjust_chroma(self, x):
+    def set_lightness(self,lightness):
+        ''' overwrites lightness with scalar or sequence'''
+        fn = lambda c,x: (x,c[1],c[2])
+        return self._map2(lightness,fn)
+
+    def set_chroma(self,chroma):
+        ''' overwrites chroma with scalar or sequence'''
+        fn = lambda c,x: (c[0],x,c[2])
+        return self._map2(chroma,fn)
+
+
+
+
+    def exposure(self, multipliers):
+        ''' multiply luma by x '''
+        fn = lambda c,x: (c[0]*x,c[1],c[2])
+        return self._map2(multipliers,fn)
+
+    def adjust_chroma(self, multipliers):
         ''' multiply chroma by x '''
-        colors = self.map(lambda c : (c[0],c[1]*x,c[2]))
-        return OKLCHPalette(colors)
+        fn = lambda c,x : (c[0],c[1]*x,c[2])
+        return self._map2(multipliers,fn)
+
+    def limit_chroma(self, max_chroma):
+        fn = lambda c,x : (c[0],min(c[1],x),c[2])
+        return self._map2(max_chroma,fn)
+
+    def linearize_lightness(self, min_lightness=0.25, max_lightness=0.9):
+        lightness = np.linspace(min_lightness, max_lightness, len(self.colors))
+        return self.set_lightness(lightness)
+
+    def set_random_lightness(self, seed=None, min_lightness=0.25, max_lightness=0.9):
+        rng = np.random.default_rng(seed)
+        lightness = rng.uniform(min_lightness, max_lightness, len(self.colors))
+        return self.set_lightness(lightness)
+
+    def set_random_chroma(self, seed=None, min_chroma=0.25, max_chroma=0.9):
+        rng = np.random.default_rng(seed)
+        chroma = rng.uniform(min_chroma, max_chroma, len(self.colors))
+        return self.set_chroma(chroma)
 
     def adjust_saturation(self, x):
         ''' just an alias for adjust_chroma '''
@@ -606,13 +676,27 @@ class OKLCHPalette(ColorPalette):
         else:
             return self
 
-    def fade_adaptive(self, t:float):
-        ''' takes a float [0,1] and darkens bright colors and whitens darker ones '''
-        luma = self.get_luma()
-        if luma < 0.5:
-            return self.__whiten(t)
-        else:
-            return self.__blacken(t)
+
+    def sort_for_roles(self):
+        '''
+        This function tries and sorts the colors based on their hues in a way that they align well with their target role.
+        For example no muddy yellows or greens.
+        '''
+        def get_hue_weight(color):
+            h = color[2]
+            warm_dist = min(abs(h - 20), 360 - abs(h - 20))
+            yellow_dist = min(abs(h - 95), 360 - abs(h - 95))
+            warm_score = (180 - warm_dist) / 180
+            yellow_score = (180 - yellow_dist) / 180
+            
+            final_score = (warm_score * 1.0) + (yellow_score * 0.5)
+            return final_score
+
+        weights = self.map(get_hue_weight) 
+
+        indices = np.argsort(weights)
+        colors = self.colors[indices]
+        return self._as_self(colors)
 
 
 
@@ -621,8 +705,8 @@ class OKLCHPalette(ColorPalette):
     # they never return the base colors (except analogous on uneven step number)
 
     ################################
-    def complement(self):
-        return self.shift_hue(-180)
+    def complement(self, bias=0):
+        return self.shift_hue(-180 + bias)
 
 
     def triadic(self):
@@ -637,18 +721,20 @@ class OKLCHPalette(ColorPalette):
         c =  self.shift_hue(270)
         return a.join(b,c)
 
-    def analogous(self, num=5, stepsize=20):
-        self = self.shift_hue(float(num)/2.0*-stepsize)
-        out = self
+    def analogous(self, num, stepsize=30):
+        first = self.shift_hue((float(num-1)/2.0)*-stepsize)
+        out = first
         for i in range(1,num):
-            x = self.shift_hue(i*stepsize)
+            x = first.shift_hue(i*stepsize)
             out = out.join(x)
         return out
 
-    def split_complement(self,spread=40, bias=0):
+    def split_complement(self,spread=30, bias=0):
         ''' shorthand for complement + 2 analogous with optional shift'''
         compl = self.complement().shift_hue(bias)
-        return compl.analogous(2,spread)
+        a = compl.shift_hue(spread)
+        b = compl.shift_hue(-spread)
+        return a.join(b)
 
 
     def compound(self,spread=40, bias=0):
@@ -662,19 +748,50 @@ class OKLCHPalette(ColorPalette):
 
 
 
+    def apply_role(self, role):
+        if role == Role.DEEP_BASE:
+            out = self.set_random_lightness(min_lightness=0.2, max_lightness=0.25)
+            out = out.set_random_chroma(min_chroma=0.01, max_chroma=0.1)
+            return out
+
+        elif role == Role.MID_SUPPORT:
+            out = self.set_random_lightness(min_lightness=0.35, max_lightness=0.50)
+            out = out.set_random_chroma(min_chroma=0.1, max_chroma=0.15)
+            return out
+
+        elif role == Role.SECOND_ACCENT:
+            out = self.set_random_lightness(min_lightness=0.6, max_lightness=0.8)
+            out = out.set_random_chroma(min_chroma=0.15, max_chroma=0.25)
+            return out
+
+        elif role == Role.HERO_ACCENT:
+            out = self.set_random_lightness(min_lightness=0.8, max_lightness=0.95)
+            out = out.set_random_chroma(min_chroma=0.25, max_chroma=0.4)
+            return out
+
+        elif role == Role.HIGHLIGHT:
+            out = self.set_random_lightness(min_lightness=0.9, max_lightness=.95)
+            out = out.set_random_chroma(min_chroma=0.01, max_chroma=0.1)
+            return out
+
+        return self
+
+    def apply_roles(self, roles):
+        out = []
+        for i in range(len(self.colors)):
+            color = self[i]
+            color = color.apply_role(roles[i])
+            out.append(color)
+        return self.merge(*out)
 
 
-    # not sure id ever need this
+
+
+
+
     #def shift_chroma(self,offset):
     #    fn = lambda color: (color[0], min(1,max(0,color[1])) + offset, color[2])
     #    return OKLCHPalette(self.map(fn))
-
-
-
-    # deprecated since analogous with 2 does the same
-    def split(self, angle=20):
-        x = [self.__split(x,angle) for x in self.colors]
-        return OKLCHPalette(np.array(x).reshape((-1,3)))
 
 
 
@@ -790,6 +907,22 @@ def plot_XYY(palettes):
     plt.show()
 
 
+def plot_perceived_brightness(palette, out_file=None):
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    # the luma plot
+    x = np.arange(0.0, 1.0, 1.0 / len(palette))
+    #y = palette.to_xyY()[:, 2]
+    y = palette.luma_perceptual()
+
+    p, = ax.plot(x, y, linewidth=1.0, zorder=1)
+    p.set_linestyle(':')
+
+    ax.scatter(x, y, c=palette.to_srgb().clamp().colors, linewidth=3, zorder=2)
+    ax.set_xticks([])
+    #plt.gca().set_frame_on(False)
+    plt.show()
 
 
 def plot_colors_hsv(palette, out_file=None):
@@ -865,7 +998,7 @@ def plot_colors_hsv(palette, out_file=None):
 
 
 
-def plot_colors_oklch(palette, out_file=None):
+def plot_colors_oklch(palette, out_file=None, draw_lines=True):
 
     def oklch_to_rgb_vectorized(L_array, C_array, H_array):
         scalar_converter = lambda l, c, h: Color.oklch_to_rgb((l, c, h))
@@ -921,14 +1054,22 @@ def plot_colors_oklch(palette, out_file=None):
 
         dot_x = dot_radius * np.cos(dot_theta)
         dot_y = dot_radius * np.sin(dot_theta)
+
+        if draw_lines:
+            line_x = (0,dot_x)
+            line_y = (0,dot_y)
+            line, = ax.plot(line_x, line_y, linewidth=2.0, color='white',zorder=1)
+            line.set_linestyle(':')
         
         ax.scatter(
             dot_x, dot_y, 
+            zorder=2,
             color=[rgb],
             edgecolors='white', 
             linewidths=2.0, 
             s=150, 
         )
+
 
     ax.set_xlim(-1.05, 1.05)
     ax.set_ylim(-1.05, 1.05)
