@@ -191,22 +191,36 @@ def example_split_complementary_01(seed=None):
 	colors = colors.limit_chroma(0.2)
 	colors = colors.linearize_lightness()
 	colors = colors.make_srgb_safe()
-	pretty_preview(colors, "images/split_complement_00.jpg")
+	pretty_preview(colors, "images/split_complement_00.png")
 	mxr.plot_colors_oklch(colors,out_file="images/split_complement_00_wheel.png")
 	#mxr.plot_XYY([colors])
 
 
 
-def example_square():
+def example_square_with_protanopia():
 
 	root = OKLCHPalette.new_random(1)
 	square = root.square()
-	c5 = square[0].fade(0.5) 
+	colors = root.join(square).sort_for_roles()
 
-	colors = root.join(square,c5)
-	#colors = colors.make_srgb_safe()
-	pretty_preview(colors, "images/square_00.jpg")
-	mxr.plot_colors_oklch(colors, out_file="images/square_00_wheel.png")
+	# appending the root again at the end to become our highlight colo
+	colors = colors.join(colors[0])
+
+	roles = [
+		mxr.Role.DEEP_BASE,
+		mxr.Role.MID_SUPPORT,
+		mxr.Role.HERO_ACCENT,
+		mxr.Role.SECOND_ACCENT,
+		mxr.Role.HIGHLIGHT]
+
+	colors = colors.apply_roles(roles)
+	labels = ['background', 'midtone', 'secondary accent', 'main accent', 'highlight']
+
+	pretty_preview(colors, "images/square_00.png",color_labels=labels)
+	#mxr.plot_colors_oklch(colors, out_file="images/square_00_wheel.png")
+
+	colors = colors.simulate_cvd(mxr.CVDType.PROTANOPIA)
+	pretty_preview(colors, "images/square_00_protanopia.png",color_labels=labels)
 
 
 
@@ -222,7 +236,7 @@ def example_analogous(seed=None):
 		mxr.Role.HIGHLIGHT]
 	colors = colors.apply_roles(roles)
 	labels = ['background', 'midtone', 'secondary accent', 'main accent', 'highlight']
-	pretty_preview(colors, "images/analogous_00.jpg", color_labels=labels)
+	pretty_preview(colors, "images/analogous_00.png", color_labels=labels)
 	mxr.plot_colors_oklch(colors, out_file="images/analogous_00_wheel.png")
 
 
@@ -234,7 +248,7 @@ def example_compound(seed=None):
 	colors = root.join(compound,c5)
 	colors = colors.sort_brightness()
 	#colors = colors.make_srgb_safe()
-	pretty_preview(colors, "images/compound_00.jpg")
+	pretty_preview(colors, "images/compound_00.png")
 	mxr.plot_colors_oklch(colors, out_file="images/compound_00_wheel.png")
 
 
@@ -250,13 +264,10 @@ print(f"Example Seed: {seed}")
 #example_split_complementary_00(seed)
 #example_split_complementary_01(seed)
 #example_triadic()
-#example_square()
-example_analogous(seed)
+#example_analogous(seed)
 #example_compound(seed)
 
-
-
-
+example_square_with_protanopia()
 
 
 

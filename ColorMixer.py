@@ -3,24 +3,104 @@ import matplotlib
 import matplotlib.pyplot as plt
 #import matplotlib.colors as mcolors
 import matplotlib.patches as patches
-from enum import Enum, unique
+from enum import Enum, unique, auto
 
 import math
 import numpy as np
 
 
 class Role(Enum):
-    DEEP_BASE = 0
-    MID_SUPPORT = 1
-    SECOND_ACCENT = 2
-    HERO_ACCENT = 3
-    HIGHLIGHT = 4
+    DEEP_BASE = auto()
+    MID_SUPPORT = auto()
+    SECOND_ACCENT = auto()
+    HERO_ACCENT = auto()
+    HIGHLIGHT = auto()
 
 
+class CVDType(Enum):
+    PROTANOPIA = 0
+    DEUTERANOPIA = 1
+    TRITANOPIA = 2
 
 # utility class with conversion function.
 # TODO rename and/or move into palette parent class
-class Color:
+class ColorUtils:
+
+    RGB_TO_LMS_MATRIX = np.array([
+        [0.4122214708, 0.5363325363, 0.0514459929],
+        [0.2119034982, 0.6806995451, 0.1073969566],
+        [0.0883024619, 0.2817188376, 0.6299787005]
+    ])
+
+    LMS_TO_OKLAB_MATRIX = np.array([
+        [0.2104542553,  0.7936177850, -0.0040720468],
+        [1.9779984951, -2.4285922050,  0.4505937099],
+        [0.0259040371,  0.7827717662, -0.8086757660]
+    ])
+
+    OKLAB_TO_LMS_MATRIX = np.array([
+        [1.0000000000,  0.3963377922,  0.2158037573],
+        [1.0000000000, -0.1055613423, -0.0638541748],
+        [1.0000000000, -0.0894841821, -1.2914855379]
+    ])
+
+    LMS_TO_RGB_MATRIX = np.array([
+        [ 4.0767416621, -3.3077115913,  0.2309699292],
+        [-1.2684380046,  2.6097574011, -0.3413193965],
+        [-0.0041960863, -0.7034186147,  1.7076147010]
+    ])
+
+    RGB_TO_XYZ_MATRIX = np.array([
+        [0.4124, 0.3576, 0.1805],
+        [0.2126, 0.7152, 0.0722],
+        [0.0193, 0.1192, 0.9505]])
+
+
+
+    # taken from the color-science implementation of Machado et al. (2009)
+    # https://colour.readthedocs.io/en/v0.4.5/#colour-blindness-colour-blindness
+
+    LINEAR_RGB_APPLY_PROTANOPIA = np.array([
+        [ 0.152286,  1.052583, -0.204868],
+        [ 0.114503,  0.786281,  0.099216],
+        [-0.003882, -0.048116,  1.051998],
+    ])
+
+    LINEAR_RGB_APPLY_DEUTERANOPIA = np.array([
+        [ 0.367322,  0.860646, -0.227968],
+        [ 0.280085,  0.672501,  0.047413],
+        [-0.011820,  0.042940,  0.968881],
+    ])
+
+    LINEAR_RGB_APPLY_TRITANOPIA = np.array([
+        [ 1.255528, -0.076749, -0.178779],
+        [-0.078411,  0.930809,  0.147602],
+        [ 0.004733,  0.691367,  0.303900],
+    ])
+
+    # mid level deficiencies
+    # as far as i understood these are estimated interpolations?
+    # maybe not reliable
+    LINEAR_RGB_APPLY_PROTANOMALY_50 = np.array([
+        [ 0.551061, 0.540134, -0.091195],
+        [ 0.060144, 0.887224,  0.052632],
+        [-0.001941, -0.021021,  1.022962]
+    ])
+
+    LINEAR_RGB_APPLY_DEUTERANOMALY_50 = np.array([
+        [ 0.665584, 0.441460, -0.107044],
+        [ 0.134015, 0.825227,  0.040758],
+        [-0.005910, 0.021111,  0.984799]
+    ])
+
+    LINEAR_RGB_APPLY_TRITANOMALY_50 = np.array([
+        [ 1.011585, 0.018151, -0.029736],
+        [ 0.003359, 0.978586,  0.018055],
+        [-0.002228, 0.144844,  0.857384]
+    ])
+
+
+
 
     def rgb_to_hsv(rgb):
         r, g, b = rgb
@@ -65,6 +145,24 @@ class Color:
         if i == 5:
             return v, p, q
 
+    @classmethod
+    def rgb_to_oklab(cls, rgb):
+        lms = cls.RGB_TO_LMS_MATRIX @ rgb
+        # supposedly quicker than **(1 / 3)
+        lms_cube = np.cbrt(lms)
+        oklab = cls.LMS_TO_OKLAB_MATRIX @ lms_cube
+        return tuple(oklab.tolist())
+
+
+
+    @classmethod
+    def oklab_to_rgb(cls, oklab):
+        lms_cube = cls.OKLAB_TO_LMS_MATRIX @ oklab
+        lms = lms_cube ** 3
+        rgb = cls.LMS_TO_RGB_MATRIX @ lms
+        return tuple(rgb.tolist())
+
+    '''
     @staticmethod
     def rgb_to_oklab(rgb):
         r, g, b = rgb
@@ -92,7 +190,7 @@ class Color:
         return (+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
                 -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
                 -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)
-
+    '''
     @classmethod
     def rgb_to_oklch(cls, rgb):
         return cls.oklab_to_oklch(cls.rgb_to_oklab(rgb))
@@ -177,14 +275,11 @@ class Color:
         expects linear 0-1 rgb
         '''
         r, g, b = rgb
-        rgb_to_xyz_matrix = np.array([[0.4124, 0.3576, 0.1805],
-                                       [0.2126, 0.7152, 0.0722],
-                                       [0.0193, 0.1192, 0.9505]])
-
+   
         rgb_vector = np.array([r, g, b])
 
         # convert to XYZ tristimulus values
-        xyz_vector = np.dot(rgb_to_xyz_matrix, rgb_vector)
+        xyz_vector = np.dot(RGB_TO_XYZ_MATRIX, rgb_vector)
         x, y, z = xyz_vector[0], xyz_vector[1], xyz_vector[2]
 
         # handle black
@@ -256,7 +351,11 @@ class ColorPalette:
 
     @classmethod
     def _as_self(cls, colors):
-        ''' wraps the color array in the current class '''
+        ''' 
+        wraps the RAW color array in the current class
+        IMPORTANT does not convert! Only use when color type does not change
+        Use from_color(color) if it does!!
+        '''
         return cls(colors)
 
     @classmethod
@@ -269,11 +368,11 @@ class ColorPalette:
 
     def luma_physical(self):
         rgb = self.to_rgb()
-        return [Color.rgb_to_physical_luma(x) for x in rgb.colors]
+        return [ColorUtils.rgb_to_physical_luma(x) for x in rgb.colors]
 
     def luma_perceptual(self):
         rgb = self.to_rgb()
-        return [Color.rgb_to_perceived_luma(x) for x in rgb.colors]
+        return [ColorUtils.rgb_to_perceived_luma(x) for x in rgb.colors]
 
     @classmethod
     def from_channels(cls, a, b=None, c=None, name=None):
@@ -287,8 +386,7 @@ class ColorPalette:
         return self._as_self(colors)
 
     def clamp(self):
-        current_class = type(self)
-        return current_class(self.map(Color.clamp))
+        raise NotImplementedError
 
     def get_channel(self, index=0):
         ''' return an array of only the indexed channel values '''
@@ -309,13 +407,27 @@ class ColorPalette:
         return self._as_self(colors)
 
 
+    def simulate_cvd(self, cvd_type):
+
+        matrix = None 
+
+        if cvd_type == CVDType.PROTANOPIA:     matrix = ColorUtils.LINEAR_RGB_APPLY_PROTANOPIA
+        elif cvd_type == CVDType.DEUTERANOPIA: matrix = ColorUtils.LINEAR_RGB_APPLY_DEUTERANOPIA
+        elif cvd_type == CVDType.TRITANOPIA:   matrix = ColorUtils.LINEAR_RGB_APPLY_TRITANOPIA
+        else: 
+            raise NotImplementedError("CVD Type not implemented")
+
+        lin_rgb = self.to_rgb().clamp()
+        colors = lin_rgb.map( lambda c : matrix @ c)
+        return self.from_color(RGBPalette(colors))
+
 
 
 
 
 
     @classmethod
-    def interpolate(cls, a, b, t: float):
+    def lerp(cls, a, b, t: float):
         ''' 
         Convert colors to this color mode and return linear interpolated color 
         Best use OKLAB for this
@@ -385,13 +497,17 @@ class SRGBPalette(ColorPalette):
 
     @classmethod
     def from_hex(cls, *hexes):
-        rgb = [Color.hex_to_rgb(x) for x in hexes]
+        rgb = [ColorUtils.hex_to_rgb(x) for x in hexes]
         return cls(np.array(rgb))
 
     @classmethod
     def from_color(color):
         ''' new sRGB from an unknown Color Class '''
         return color.to_rgb().to_srgb()
+
+    #@staticmethod
+    #def from_oklch(oklch):
+    #    return oklch.to_srgb()
 
     @classmethod
     def from_channel(cls, channel):
@@ -400,10 +516,10 @@ class SRGBPalette(ColorPalette):
         return SRGBPalette(colors)
 
     def to_rgb(self):
-        return RGBPalette(self.map(Color.srgb_to_linear_rgb))
+        return RGBPalette(self.map(ColorUtils.srgb_to_linear_rgb))
 
     def to_hex(self):
-        return [Color.rgb_to_hex(x) for x in self.colors]
+        return [ColorUtils.rgb_to_hex(x) for x in self.colors]
 
     def to_xy(self):
         return self.to_rgb().to_xy()
@@ -411,11 +527,8 @@ class SRGBPalette(ColorPalette):
     def to_srgb(self):
         return self
 
-
-    @staticmethod
-    def from_oklch(oklch):
-        return oklch.to_srgb()
-
+    def clamp(self):
+        return SRGBPalette(self.colors.clip(0,1))
 
 
 
@@ -454,20 +567,20 @@ class RGBPalette(ColorPalette):
         return RGBPalette(self.map(lambda x: pow(x, value)))
 
     def to_oklch(self):
-        return OKLCHPalette(self.map(Color.rgb_to_oklch))
+        return OKLCHPalette(self.map(ColorUtils.rgb_to_oklch))
 
     def to_oklab(self):
-        return OKLABPalette(self.map(Color.rgb_to_oklab))
+        return OKLABPalette(self.map(ColorUtils.rgb_to_oklab))
 
     def to_hsv(self):
         ''' clamping to 0-1 otherwise hsv bugs out '''
-        return HSVPalette(self.clamp().map(Color.rgb_to_hsv))
+        return HSVPalette(self.clamp().map(ColorUtils.rgb_to_hsv))
 
     def to_srgb(self):
-        return SRGBPalette(self.map(Color.linear_rgb_to_srgb))
+        return SRGBPalette(self.map(ColorUtils.linear_rgb_to_srgb))
 
     def to_luma(self):
-        return RGBPalette(self.map(Color.rgb_to_luma))
+        return RGBPalette(self.map(ColorUtils.rgb_to_luma))
 
     def to_rgb(self):
         return self
@@ -476,15 +589,17 @@ class RGBPalette(ColorPalette):
         return self.to_srgb().to_hex()
 
     def to_xyY(self):
-        return np.array([Color.rgb_to_xyY(x) for x in self.colors])
+        return np.array([ColorUtils.rgb_to_xyY(x) for x in self.colors])
 
     def to_xy(self):
-        return [Color.rgb_to_xy(x) for x in self.colors]
+        return [ColorUtils.rgb_to_xy(x) for x in self.colors]
 
     def invert(self):
         colors = self.map(lambda x: (1.0-x[0], 1.0-x[1], 1.0-x[2]))
         return RGBPalette(colors)
 
+    def clamp(self):
+        return RGBPalette(self.colors.clip(0,1))
 
 
 
@@ -513,10 +628,10 @@ class OKLCHPalette(ColorPalette):
         return self
 
     def to_oklab(self):
-        return OKLABPalette(self.map(Color.oklch_to_oklab))
+        return OKLABPalette(self.map(ColorUtils.oklch_to_oklab))
 
     def to_rgb(self):
-        return RGBPalette(self.map(Color.oklch_to_rgb))
+        return RGBPalette(self.map(ColorUtils.oklch_to_rgb))
 
     def to_hsv(self):
         return self.to_rgb().to_hsv()
@@ -569,7 +684,7 @@ class OKLCHPalette(ColorPalette):
 
         def fn(lch):
             # check if the current chroma is already safe
-            rgb = Color.linear_rgb_to_srgb(Color.oklch_to_rgb(lch))
+            rgb = ColorUtils.linear_rgb_to_srgb(ColorUtils.oklch_to_rgb(lch))
 
             if is_srgb_legal(rgb):
                 return lch
@@ -583,7 +698,7 @@ class OKLCHPalette(ColorPalette):
             # 16 iterations of trial and error
             for _ in range(16):
                 mid_c = (low_c + high_c) / 2.0
-                test_rgb = Color.linear_rgb_to_srgb(Color.oklch_to_rgb((l, mid_c, h)))
+                test_rgb = ColorUtils.linear_rgb_to_srgb(ColorUtils.oklch_to_rgb((l, mid_c, h)))
                 
                 if is_srgb_legal(test_rgb):
                     best_c = mid_c
@@ -654,16 +769,16 @@ class OKLCHPalette(ColorPalette):
     def __whiten(self, t:float):
         ''' fades to white: increases luma, reduces saturation, leaves hue as is '''
         def fn(lch):
-            luma   = Color.lerp_float(lch[0],1.0,t)
-            chroma = Color.lerp_float(lch[1],0.0,t)
+            luma   = ColorUtils.lerp_float(lch[0],1.0,t)
+            chroma = ColorUtils.lerp_float(lch[1],0.0,t)
             return(luma,chroma,lch[2])
         return OKLCHPalette(self.map(fn))
 
     def __blacken(self, t:float):
         ''' fades to black: decreases luma, reduces saturation, leaves hue as is '''
         def fn(lch):
-            luma   = Color.lerp_float(lch[0],0.0,t)
-            chroma = Color.lerp_float(lch[1],0.0,t)
+            luma   = ColorUtils.lerp_float(lch[0],0.0,t)
+            chroma = ColorUtils.lerp_float(lch[1],0.0,t)
             return(luma,chroma,lch[2])
         return OKLCHPalette(self.map(fn))
 
@@ -813,10 +928,10 @@ class OKLABPalette(ColorPalette):
         return self
 
     def to_oklch(self):
-        return OKLCHPalette(self.map(Color.oklab_to_oklch))
+        return OKLCHPalette(self.map(ColorUtils.oklab_to_oklch))
 
     def to_rgb(self):
-        return RGBPalette(self.map(Color.oklab_to_rgb))
+        return RGBPalette(self.map(ColorUtils.oklab_to_rgb))
 
     def to_hex(self):
         return self.to_rgb().to_hex()
@@ -837,7 +952,7 @@ class HSVPalette(ColorPalette):
 
 
     def to_rgb(self):
-        return RGBPalette(self.map(Color.hsv_to_rgb))
+        return RGBPalette(self.map(ColorUtils.hsv_to_rgb))
 
     def to_srgb(self):
         return self.to_rgb().to_srgb()
@@ -1001,7 +1116,7 @@ def plot_colors_hsv(palette, out_file=None):
 def plot_colors_oklch(palette, out_file=None, draw_lines=True):
 
     def oklch_to_rgb_vectorized(L_array, C_array, H_array):
-        scalar_converter = lambda l, c, h: Color.oklch_to_rgb((l, c, h))
+        scalar_converter = lambda l, c, h: ColorUtils.oklch_to_rgb((l, c, h))
         vectorized_func = np.vectorize(scalar_converter)
         R_grid, G_grid, B_grid = vectorized_func(L_array, C_array, H_array)
         return np.dstack((R_grid, G_grid, B_grid)).astype(float)
