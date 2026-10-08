@@ -18,7 +18,7 @@ Usually I find analogous palettes difficult to use. But applying the roles sets 
 ![example](images/analogous_00.jpg)
 ![example](images/analogous_00_wheel.png)
 
-I would recommend using the colour-science module but you can quickly check you palette with the most common types of color vision deficancies.
+I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) module but you can quickly check you palettes against the most common types of color vision deficiency.
 The transformations are taken straight from there. A square harmony palette with and without protanopia simulation:
 
 ![example](images/square_00_vs_protanopia.png)
