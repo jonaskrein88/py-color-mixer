@@ -3,12 +3,10 @@
 
 from ColorMixer import RGBPalette, OKLCHPalette, HSVPalette, OKLABPalette
 import ColorMixer as mxr
-import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
-
+import numpy as np
 import random
-
 
 
 
@@ -52,7 +50,6 @@ def pretty_preview(palette, out_file=None, show=True, color_labels=None, title=N
 
 		# write label if present
 		if color_labels:
-
 			label_text = color_labels[i]
 			label_text_x = x_start + (column_width - draw.textlength(label_text, font=font_label)) / 2
 			draw.text((label_text_x, image_height - 60), label_text, fill=text_color, font=font_label)
@@ -85,11 +82,13 @@ def pretty_preview(palette, out_file=None, show=True, color_labels=None, title=N
 
 
 
+
+
+
 def example_smooth_luma_00():
 	'''
 	generates a color palette and remaps the luma so it has a smooth brightness gradient
 	'''
-
 	# as a starting point we just take red, green and blue and rotate them in OKCLCH
 	lch    = RGBPalette.from_hex('ff0000', '00ff00', '0000ff').to_oklch()
 	colors = lch.shift_hue(-120).resize(7)
@@ -136,7 +135,7 @@ def example_triadic(seed=None):
 	root = OKLCHPalette.new_random(1,seed=seed)
 	triad = root.triadic()
 
-	# try and asign the roles optimally based on hue
+	# try and auto asign the roles optimally based on hue
 	sorted_colors = root.join(triad).sort_for_roles()
 
 	base 		 = sorted_colors[0].apply_role(mxr.Role.DEEP_BASE)
@@ -154,43 +153,54 @@ def example_triadic(seed=None):
 
 
 
-# hardcoded seed for testing
+
 def example_split_complementary_00(seed=None):
+	'''
+	split complementary via complement + analogous
+	seed hardcoded for testing
+	''' 
 	root = OKLCHPalette.new_random(1,seed=42)
-
 	comp = root.complement(bias=0).analogous(2,35)
-
-
 	base 		 = root.apply_role(mxr.Role.DEEP_BASE)
 	mid  		 = root.apply_role(mxr.Role.MID_SUPPORT)
 	heroAccent   = comp[0].apply_role(mxr.Role.HERO_ACCENT)
 	secondAccent = comp[1].apply_role(mxr.Role.SECOND_ACCENT)
 	highlight    = root.apply_role(mxr.Role.HIGHLIGHT)
-
 	colors = base.join(mid,secondAccent, heroAccent, highlight)
 	labels = ['background', 'midtone', 'secondary accent', 'main accent', 'highlight']
-
 	pretty_preview(colors, "images/split_complement_02.jpg", color_labels=labels)
 	mxr.plot_colors_oklch(colors, out_file="images/split_complement_02_wheel.png")
 	#mxr.plot_perceived_brightness(colors)
 
 
 
+
+
+
+def create_split_complementary_5(seed=None):
+
+	roles = [
+		mxr.Role.DEEP_BASE,
+		mxr.Role.MID_SUPPORT,
+		mxr.Role.HERO_ACCENT,
+		mxr.Role.SECOND_ACCENT,
+		mxr.Role.HIGHLIGHT]
+
+	root = OKLCHPalette.new_random(1,seed=seed)  # -> palette of size 1
+	sc   = root.split_complement(bias=30)         # -> palette of size 2
+
+	colors = ( 
+		OKLCHPalette.merge(root, root, sc, root) # -> palette of size 5
+		.apply_roles(roles)
+		.limit_chroma(0.2)
+		.linearize_lightness()
+		.make_srgb_safe()
+	)
+
+	return colors
+
 def example_split_complementary_01(seed=None):
-
-	root = OKLCHPalette.new_random(1,seed=seed)
-
-	split = root.split_complement(bias=0)
-	base 		 = root.apply_role(mxr.Role.DEEP_BASE)
-	mid  		 = root.apply_role(mxr.Role.MID_SUPPORT)
-	heroAccent   = split[1].apply_role(mxr.Role.HERO_ACCENT)
-	secondAccent = split[0].apply_role(mxr.Role.SECOND_ACCENT)
-	highlight    = root.apply_role(mxr.Role.HIGHLIGHT)
-
-	colors = base.join(mid,secondAccent, heroAccent, highlight)
-	colors = colors.limit_chroma(0.2)
-	colors = colors.linearize_lightness()
-	colors = colors.make_srgb_safe()
+	colors = create_split_complementary_5(seed)
 	pretty_preview(colors, "images/split_complement_00.png")
 	mxr.plot_colors_oklch(colors,out_file="images/split_complement_00_wheel.png")
 	#mxr.plot_XYY([colors])
@@ -202,8 +212,7 @@ def example_square_with_protanopia():
 	root = OKLCHPalette.new_random(1)
 	square = root.square()
 	colors = root.join(square).sort_for_roles()
-
-	# appending the root again at the end to become our highlight colo
+	# appending the root again at the end to become our highlight color
 	colors = colors.join(colors[0])
 
 	roles = [
@@ -215,10 +224,8 @@ def example_square_with_protanopia():
 
 	colors = colors.apply_roles(roles)
 	labels = ['background', 'midtone', 'secondary accent', 'main accent', 'highlight']
-
 	pretty_preview(colors, "images/square_00.png",color_labels=labels)
 	#mxr.plot_colors_oklch(colors, out_file="images/square_00_wheel.png")
-
 	colors = colors.simulate_cvd(mxr.CVDType.PROTANOPIA)
 	pretty_preview(colors, "images/square_00_protanopia.png",color_labels=labels)
 
@@ -262,12 +269,10 @@ print(f"Example Seed: {seed}")
 #example_smooth_luma_00()
 #example_smooth_luma_01()
 #example_split_complementary_00(seed)
-#example_split_complementary_01(seed)
+example_split_complementary_01(seed)
 #example_triadic()
 #example_analogous(seed)
 #example_compound(seed)
-
-example_square_with_protanopia()
-
+#example_square_with_protanopia()
 
 

@@ -362,7 +362,8 @@ class ColorPalette:
     def merge(cls,*palettes):
         ''' constructs a new joined palette from palettes'''
         colors = [cls.from_color(p).colors for p in palettes]
-        out = np.array(colors).reshape(-1,3)
+        flattened = [pixel for group in colors for pixel in group]
+        out = np.array(flattened).reshape(-1,3)
         return cls._as_self(out)
 
 
@@ -658,7 +659,7 @@ class OKLCHPalette(ColorPalette):
 
 
 
-
+    def make_safe_chorma(self):
     # doesn't guarantee valid srgb results and sets the chroma. very invasive
         lightness = self.get_lightness()
         max_safe_chroma = np.where(
