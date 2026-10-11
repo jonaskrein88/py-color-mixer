@@ -25,7 +25,6 @@ sc   = root.split_complement(bias=30)        # -> palette of size 2
 colors = ( 
   OKLCHPalette.merge(root, root, sc, root) # -> palette of size 5
   .apply_roles(roles)
-  .limit_chroma(0.2)  # keep it calm and classy
   .make_srgb_safe()   # prettier than clipping, just in case we went out of gamut along the way
 )
 
