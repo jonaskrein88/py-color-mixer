@@ -7,24 +7,54 @@ It is mostly build around the [OKLCH](https://oklch.com) color space to create p
 
 The palettes are built on Numpy and all operations work on whole color palettes. Even single colors are implemented as color palettes.
 
-To make sure our colors don't compete with one another we can assign them roles. 
+## usage
+To make sure our colors don't compete with one another we can assign explicit roles to them. 
 Example palette based on a (slightly shifted) split complement harmony.
+```python
+roles = [
+  Role.DEEP_BASE,
+  Role.MID_SUPPORT,
+  Role.HERO_ACCENT,
+  Role.SECOND_ACCENT,
+  Role.HIGHLIGHT
+]
 
+root = OKLCHPalette.new_random(1,seed=None)  # -> palette of size 1
+sc   = root.split_complement(bias=30)        # -> palette of size 2
+
+colors = ( 
+  OKLCHPalette.merge(root, root, sc, root) # -> palette of size 5
+  .apply_roles(roles)
+  .limit_chroma(0.2)
+  .make_srgb_safe()
+)
+
+hex_codes = colors.to_hex()   # will handle the srgb conversion
+```
 ![example](images/split_complement_02.jpg)
 ![example](images/split_complement_02_wheel.png)
 
+## Analogous example
 Usually I find analogous palettes difficult to use. But applying the roles sets the lightness and chroma accordingly, so that we still get a functional result.
 
 ![example](images/analogous_00.jpg)
 ![example](images/analogous_00_wheel.png)
 
+## Color Vision deficency emulation
 I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) module but you can quickly check you palettes against the most common types of color vision deficiency.
-The transformations are taken straight from there. A square harmony palette with and without protanopia simulation:
+- Protanopia / Protanomaly(50%)
+- Deuteranopia / Deuteranomaly (50%)
+- Tritanopia / Tritanomaly (50%)
+
+The full severity transformations are taken straight from colour-science, the 50% severities are estimates.
+
+A square harmony palette with and without protanopia emulation:
 
 ![example](images/square_00_vs_protanopia.png)
 
+## Linear Lightness example
 
-OKLCH is designed to maintain a consistent perceived brightness. So it is quite easy to remap random colors to have a linear gradient.
+OKLAB and OKLCH are designed to maintain a consistent perceived brightness. This comes in very useful to create colors with a linear lightness gradient.
 Example from my [Unity dithering project](https://www.artstation.com/artwork/dyA5g3):
 
 ![example](images/smooth_palette_00.jpg)
