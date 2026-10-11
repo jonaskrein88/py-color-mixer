@@ -1,5 +1,5 @@
 # py-color-mixer
-Python utility to create and process color palettes
+Python utility to create, process usable artistic color palettes
 
 A collection of color math functions to procedurally create color palettes. This is an extension of the Python script I used for my [procedural graffiti generator](https://www.artstation.com/artwork/DvVJNG). 
 
