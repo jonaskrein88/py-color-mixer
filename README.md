@@ -1,9 +1,9 @@
 # py-color-mixer
-Python utility to create, process usable artistic color palettes
+Python utility to procedurally generate and process usable artistic color palettes. No AI just math.
 
-A collection of color math functions to procedurally create color palettes. This is an extension of the Python script I used for my [procedural graffiti generator](https://www.artstation.com/artwork/DvVJNG). 
+A collection of color math functions to procedurally create color palettes. It is an iteration on a Python script for Substance Designer I wrote for my [procedural graffiti generator](https://www.artstation.com/artwork/DvVJNG) and yields much better results.
 
-It is mostly build around the [OKLCH](https://oklch.com) color space to create palettes based on color harmonies but there are conversions to some other color spaces, like [OKLAB](https://bottosson.github.io/posts/oklab/) for interpolating between colors.
+It is mostly build around the [OKLCH](https://oklch.com) color space to create palettes based on color harmonies but there are conversions to some other color spaces, like [OKLAB](https://bottosson.github.io/posts/oklab/) for interpolating between colors, sRGB to import/export hex codes, etc.
 
 The palettes are built on Numpy and all operations work on whole color palettes. Even single colors are implemented as color palettes.
 
@@ -25,11 +25,11 @@ sc   = root.split_complement(bias=30)        # -> palette of size 2
 colors = ( 
   OKLCHPalette.merge(root, root, sc, root) # -> palette of size 5
   .apply_roles(roles)
-  .limit_chroma(0.2)
-  .make_srgb_safe()
+  .limit_chroma(0.2)  # keep it calm and classy
+  .make_srgb_safe()   # prettier than clipping, just in case we went out of gamut along the way
 )
 
-hex_codes = colors.to_hex()   # will handle the srgb conversion
+hex_codes = colors.to_hex()   # will handle the OKlch-sRGB conversion
 ```
 ![example](images/split_complement_02.jpg)
 ![example](images/split_complement_02_wheel.png)
