@@ -56,6 +56,6 @@ A square harmony palette with and without protanopia emulation:
 OKLAB and OKLCH are designed to maintain a consistent perceived brightness. This comes in very useful to create colors with a linear lightness gradient.
 Example from my [Unity dithering project](https://www.artstation.com/artwork/dyA5g3):
 
-![example](images/smooth_palette_00.jpg)
+![example](images/smooth_palette_00.png)
 
 ![example](images/demon_smooth_palette_00.png)
