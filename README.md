@@ -19,8 +19,8 @@ roles = [
   Role.HIGHLIGHT
 ]
 
-root = OKLCHPalette.new_random(1,seed=None)  # -> palette of size 1
-sc   = root.split_complement(bias=30)        # -> palette of size 2
+root   = OKLCHPalette.new_random(1,seed=None)  # -> palette of size 1
+splits = root.split_complement(bias=30)        # -> palette of size 2
 
 colors = ( 
   OKLCHPalette.merge(root, root, sc, root) # -> palette of size 5
@@ -30,14 +30,14 @@ colors = (
 
 hex_codes = colors.to_hex()   # will handle the OKlch-sRGB conversion
 ```
-![example](images/split_complement_02.jpg)
-![example](images/split_complement_02_wheel.png)
+![example](images/split_complement_v1_example.svg)
+![example](images/split_complement_wheel.png)
 
 ## Analogous example
-Usually I find analogous palettes difficult to use. But applying the roles sets the lightness and chroma accordingly, so that we still get a functional result.
+Aapplying the roles sets the lightness and chroma accordingly, so that we get a palette with enough contrast.
 
-![example](images/analogous_00.jpg)
-![example](images/analogous_00_wheel.png)
+![example](images/analogous_palette_examples.svg)
+![example](images/analogous_palette_wheel.png)
 
 ## Color Vision deficency emulation
 I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) module but you can quickly check you palettes against the most common types of color vision deficiency.
@@ -49,13 +49,25 @@ The full severity transformations are taken straight from colour-science, the 50
 
 A square harmony palette with and without protanopia emulation:
 
-![example](images/square_00_vs_protanopia.png)
+![colors_vs_protanopia](images/square_vs_protanopia.png)
+![square_example](images/square_example.svg)
+![square_example_vs_protanopia](images/square_protanopia_example.svg)
+
 
 ## Linear Lightness example
 
 OKLAB and OKLCH are designed to maintain a consistent perceived brightness. This comes in very useful to create colors with gradual brightness.
 Example from my [Unity dithering project](https://www.artstation.com/artwork/dyA5g3):
 
-![example](images/smooth_palette_00.png)
+![example](images/smooth_palette.png)
 
-![example](images/demon_smooth_palette_00.png)
+![example](images/smooth_palette_example.png)
+
+
+vecteezy.com/free-vector/corporate
+
+vecteezy.com/free-vector/leopard
+
+vecteezy.com/free-vector/floral
+
+freevector.com/geometric-poster-98922
