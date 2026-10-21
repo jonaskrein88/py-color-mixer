@@ -4,23 +4,27 @@ import matplotlib.pyplot as plt
 #import matplotlib.colors as mcolors
 import matplotlib.patches as patches
 from enum import Enum, unique, auto
-
+from dataclasses import dataclass
 import math
 import numpy as np
-
+from typing import List, Tuple
 
 class Role(Enum):
     DEEP_BASE = auto()
     MID_SUPPORT = auto()
     SECOND_ACCENT = auto()
     HERO_ACCENT = auto()
+    VIBANT_ACCENT = auto()
     HIGHLIGHT = auto()
 
 
 class CVDType(Enum):
-    PROTANOPIA = 0
-    DEUTERANOPIA = 1
-    TRITANOPIA = 2
+    PROTANOPIA = auto()
+    DEUTERANOPIA = auto()
+    TRITANOPIA = auto() 
+    PROTANOMALY_50 = auto()
+    DEUTERANOMALY_50 = auto()
+    TRITANOMALY_50 = auto()
 
 # utility class with conversion function.
 # TODO rename and/or move into palette parent class
@@ -162,35 +166,7 @@ class ColorUtils:
         rgb = cls.LMS_TO_RGB_MATRIX @ lms
         return tuple(rgb.tolist())
 
-    '''
-    @staticmethod
-    def rgb_to_oklab(rgb):
-        r, g, b = rgb
-        l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
-        m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
-        s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
-        l = l**(1 / 3)
-        m = m**(1 / 3)
-        s = s**(1 / 3)
-        return (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-                1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-                0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s)
 
-    @staticmethod
-    def oklab_to_rgb(lab):
-        l, a, b = lab
-        l_ = l + 0.3963377774 * a + 0.2158037573 * b
-        m_ = l - 0.1055613458 * a - 0.0638541728 * b
-        s_ = l - 0.0894841775 * a - 1.2914855480 * b
-
-        l = l_ * l_ * l_
-        m = m_ * m_ * m_
-        s = s_ * s_ * s_
-
-        return (+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-                -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-                -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)
-    '''
     @classmethod
     def rgb_to_oklch(cls, rgb):
         return cls.oklab_to_oklch(cls.rgb_to_oklab(rgb))
@@ -255,6 +231,11 @@ class ColorUtils:
         return (f(r), f(g), f(b))
 
     @staticmethod
+    def clamp(rgb):
+        r, g, b = rgb
+        return (min(1, max(0, r)), min(1, max(0, g)), min(1, max(0, b)))
+
+    @staticmethod
     def rgb_to_physical_luma(rgb):
         r, g, b = rgb
         l = (0.2126 * r) + (0.7152 * g) + (0.0722 * b)
@@ -262,15 +243,11 @@ class ColorUtils:
 
     @classmethod
     def rgb_to_perceived_luma(cls,rgb):
-        return cls.rgb_to_physical_luma(rgb) ** (1/3)
+        return cls.rgb_to_physical_luma(clamp(rgb)) ** (1/3)
 
-    @staticmethod
-    def clamp(rgb):
-        r, g, b = rgb
-        return (min(1, max(0, r)), min(1, max(0, g)), min(1, max(0, b)))
 
-    @staticmethod
-    def rgb_to_xyY(rgb):
+    @classmethod
+    def rgb_to_xyY(cls,rgb):
         '''
         expects linear 0-1 rgb
         '''
@@ -279,7 +256,7 @@ class ColorUtils:
         rgb_vector = np.array([r, g, b])
 
         # convert to XYZ tristimulus values
-        xyz_vector = np.dot(RGB_TO_XYZ_MATRIX, rgb_vector)
+        xyz_vector = np.dot(cls.RGB_TO_XYZ_MATRIX, rgb_vector)
         x, y, z = xyz_vector[0], xyz_vector[1], xyz_vector[2]
 
         # handle black
@@ -309,24 +286,26 @@ class ColorUtils:
 
 class ColorPalette:
 
-    def __init__(self, npArray, name=None):
+    def __init__(self, npArray):
 
         # handle rank
         # single channel shape (x,)
         # three channel  shape (x,3)
         # TODO single rank is not really idiomatic for most colors
+        # that's what from channel is for
         if len(npArray.shape) == 1:
             self.colors = np.stack((npArray, npArray, npArray)).T
         else:
             self.colors = npArray
 
-        self.name = name
+        self.name = None
+        self.labels = []
 
 
     def __repr__(self):
-        s = f"{self.__class__.__name__} Size:{self.colors.shape}"
+        s = f"{self.__class__.__name__} \nSize:{len(self.colors)}\nShape:{self.colors.shape}\nColors:\n"
         for c in self.colors:
-            s += str(c)
+            s += str(c) + "\n"
         return s
 
     def __getitem__(self, index):
@@ -366,7 +345,6 @@ class ColorPalette:
         out = np.array(flattened).reshape(-1,3)
         return cls._as_self(out)
 
-
     def luma_physical(self):
         rgb = self.to_rgb()
         return [ColorUtils.rgb_to_physical_luma(x) for x in rgb.colors]
@@ -376,9 +354,9 @@ class ColorPalette:
         return [ColorUtils.rgb_to_perceived_luma(x) for x in rgb.colors]
 
     @classmethod
-    def from_channels(cls, a, b=None, c=None, name=None):
+    def from_channels(cls, a, b=None, c=None):
         abc = np.stack((a, b, c)).T
-        return cls(abc, name=name)
+        return cls(abc)
 
     def channel_mix(self, other, index):
         ''' copies channel of color a and pastes it at the same index in color b'''
@@ -392,6 +370,10 @@ class ColorPalette:
     def get_channel(self, index=0):
         ''' return an array of only the indexed channel values '''
         return self.colors[:, index]
+
+    def repeat(self, n):
+        ''' repeats every color after itself '''
+        return self._as_self(self.colors.repeat(n,axis=0))
 
     def join(self, *others):
         ''' convert other palettes to this ones color mode and combine to new one ''' 
@@ -412,9 +394,13 @@ class ColorPalette:
 
         matrix = None 
 
-        if cvd_type == CVDType.PROTANOPIA:     matrix = ColorUtils.LINEAR_RGB_APPLY_PROTANOPIA
-        elif cvd_type == CVDType.DEUTERANOPIA: matrix = ColorUtils.LINEAR_RGB_APPLY_DEUTERANOPIA
-        elif cvd_type == CVDType.TRITANOPIA:   matrix = ColorUtils.LINEAR_RGB_APPLY_TRITANOPIA
+        if cvd_type   == CVDType.PROTANOPIA:     matrix = ColorUtils.LINEAR_RGB_APPLY_PROTANOPIA
+        elif cvd_type == CVDType.DEUTERANOPIA:   matrix = ColorUtils.LINEAR_RGB_APPLY_DEUTERANOPIA
+        elif cvd_type == CVDType.TRITANOPIA:     matrix = ColorUtils.LINEAR_RGB_APPLY_TRITANOPIA
+
+        elif cvd_type == CVDType.PROTANOMALY_50:     matrix = ColorUtils.LINEAR_RGB_APPLY_PROTANOMALY_50
+        elif cvd_type == CVDType.DEUTERANOMALY_50:   matrix = ColorUtils.LINEAR_RGB_APPLY_DEUTERANOMALY_50
+        elif cvd_type == CVDType.TRITANOMALY_50:     matrix = ColorUtils.LINEAR_RGB_APPLY_TRITANOMALY_50
         else: 
             raise NotImplementedError("CVD Type not implemented")
 
@@ -445,7 +431,7 @@ class ColorPalette:
         extends or shrinks the color palette to the input size
         with new colors interpolated between the first and last.
 
-        Will interpolate the channels individually in the current color space,
+        will interpolate the channels individually in the current color space,
         so the choice of color space matters.
 
         To keep the original colors in addition to new ones, the new size needs to be:
@@ -468,7 +454,7 @@ class ColorPalette:
         current_class = type(self)
         return current_class(interpolated_colors)
 
-
+    # todo vectorize
     def map(self, fn):
         '''
         utility function to map a function over the colors.
@@ -476,11 +462,12 @@ class ColorPalette:
         '''
         return np.array([fn(x) for x in self.colors])
 
+    # todo vectorize
     def _map2(self, values, fn):
         '''
         maps a function over the colors with the second parameter being a sequence
         ie. exposure( (1,0.5,0.25) )
-        If the second value is a scalar we convert it to a list
+        If the second value is a scalar it auto converts it to a list
 
         '''
         if not hasattr(values, '__iter__'):
@@ -505,10 +492,6 @@ class SRGBPalette(ColorPalette):
     def from_color(color):
         ''' new sRGB from an unknown Color Class '''
         return color.to_rgb().to_srgb()
-
-    #@staticmethod
-    #def from_oklch(oklch):
-    #    return oklch.to_srgb()
 
     @classmethod
     def from_channel(cls, channel):
@@ -559,10 +542,6 @@ class RGBPalette(ColorPalette):
         ''' Monochrome Linear RGB '''
         colors = np.stack((channel, channel, channel)).T
         return RGBPalette(colors)
-
-    #@staticmethod
-    #def from_oklch(oklch):
-    #    return oklch.to_rgb()
 
     def gamma(self, value):
         return RGBPalette(self.map(lambda x: pow(x, value)))
@@ -712,16 +691,6 @@ class OKLCHPalette(ColorPalette):
         return OKLCHPalette(self.map(fn))
 
 
-
-    # TODO
-    # make these ones take arrays as parameters:
-    def shift_hue(self,offset):
-        def fn(lch):
-            h = (lch[2] + offset) % 360
-            return (lch[0], lch[1], h)
-        return OKLCHPalette(self.map(fn))
-
-
     def set_lightness(self,lightness):
         ''' overwrites lightness with scalar or sequence'''
         fn = lambda c,x: (x,c[1],c[2])
@@ -732,8 +701,10 @@ class OKLCHPalette(ColorPalette):
         fn = lambda c,x: (c[0],x,c[2])
         return self._map2(chroma,fn)
 
-
-
+    def shift_hue(self, offset):
+        ''' offset hue by scalar or sequence'''
+        fn = lambda lch,x: (lch[0],lch[1],(lch[2]+x) % 360.0)
+        return self._map2(offset,fn)
 
     def exposure(self, multipliers):
         ''' multiply luma by x '''
@@ -745,52 +716,27 @@ class OKLCHPalette(ColorPalette):
         fn = lambda c,x : (c[0],c[1]*x,c[2])
         return self._map2(multipliers,fn)
 
-    def limit_chroma(self, max_chroma):
-        fn = lambda c,x : (c[0],min(c[1],x),c[2])
-        return self._map2(max_chroma,fn)
-
-    def linearize_lightness(self, min_lightness=0.25, max_lightness=0.9):
-        lightness = np.linspace(min_lightness, max_lightness, len(self.colors))
-        return self.set_lightness(lightness)
-
-    def set_random_lightness(self, seed=None, min_lightness=0.25, max_lightness=0.9):
-        rng = np.random.default_rng(seed)
-        lightness = rng.uniform(min_lightness, max_lightness, len(self.colors))
-        return self.set_lightness(lightness)
-
-    def set_random_chroma(self, seed=None, min_chroma=0.25, max_chroma=0.9):
-        rng = np.random.default_rng(seed)
-        chroma = rng.uniform(min_chroma, max_chroma, len(self.colors))
-        return self.set_chroma(chroma)
-
     def adjust_saturation(self, x):
         ''' just an alias for adjust_chroma '''
         return self.adjust_chroma(x)
 
-    def __whiten(self, t:float):
-        ''' fades to white: increases luma, reduces saturation, leaves hue as is '''
-        def fn(lch):
-            luma   = ColorUtils.lerp_float(lch[0],1.0,t)
-            chroma = ColorUtils.lerp_float(lch[1],0.0,t)
-            return(luma,chroma,lch[2])
-        return OKLCHPalette(self.map(fn))
+    def limit_chroma(self, max_chroma):
+        fn = lambda c,x : (c[0],min(c[1],x),c[2])
+        return self._map2(max_chroma,fn)
 
-    def __blacken(self, t:float):
-        ''' fades to black: decreases luma, reduces saturation, leaves hue as is '''
-        def fn(lch):
-            luma   = ColorUtils.lerp_float(lch[0],0.0,t)
-            chroma = ColorUtils.lerp_float(lch[1],0.0,t)
-            return(luma,chroma,lch[2])
-        return OKLCHPalette(self.map(fn))
+    def linearize_lightness(self, min=0.2, max=0.9):
+        lightness = np.linspace(min, max, len(self.colors))
+        return self.set_lightness(lightness)
 
-    def fade(self, t:float):
-        ''' takes a float [-1,1] and interpolates from black over neutral to white'''
-        if t>0:
-            return self.__whiten(t)
-        elif t<0:
-            return self.__blacken(-t)
-        else:
-            return self
+    def set_random_lightness(self, seed=None, min=0.25, max=0.9):
+        rng = np.random.default_rng(seed)
+        lightness = rng.uniform(min, max, len(self.colors))
+        return self.set_lightness(lightness)
+
+    def set_random_chroma(self, seed=None, min=0.25, max=0.9):
+        rng = np.random.default_rng(seed)
+        chroma = rng.uniform(min, max, len(self.colors))
+        return self.set_chroma(chroma)
 
 
     def sort_for_roles(self):
@@ -825,19 +771,19 @@ class OKLCHPalette(ColorPalette):
         return self.shift_hue(-180 + bias)
 
 
-    def triadic(self):
+    def generate_triadic(self):
         a =  self.shift_hue(120)
         b =  self.shift_hue(-120)
         return a.join(b)
 
-    def square(self):
+    def generate_square(self):
         ''' aka tetradic '''
         a =  self.shift_hue(90)
         b =  self.shift_hue(180)
         c =  self.shift_hue(270)
         return a.join(b,c)
 
-    def analogous(self, num, stepsize=30):
+    def generate_analogous(self, num, stepsize=30):
         first = self.shift_hue((float(num-1)/2.0)*-stepsize)
         out = first
         for i in range(1,num):
@@ -845,69 +791,90 @@ class OKLCHPalette(ColorPalette):
             out = out.join(x)
         return out
 
-    def split_complement(self,spread=30, bias=0):
-        ''' shorthand for complement + 2 analogous with optional shift'''
+
+    def generate_monochromatic_shades(self, num, min_exposure=0.25):
+
+        k = 1.2
+        exposures = np.linspace(1.0, min_exposure, num, dtype=float)
+        #exposures = pow(exposures,0.45)
+        chromas   = pow(exposures,k)
+
+        base = self.repeat(num)
+        darkened = base.exposure(exposures)
+        return darkened.adjust_chroma(chromas)
+
+
+    def generate_hue_shifted_shades(self, num, min_exposure=0.25, hue_stepsize=-10):
+        shades = self.generate_monochromatic_shades(num,min_exposure)
+        offsets = np.arange(num) * hue_stepsize
+        return shades.shift_hue(offsets)
+
+
+
+    def generate_split_complement(self,stepsize=60, bias=0):
         compl = self.complement().shift_hue(bias)
-        a = compl.shift_hue(spread)
-        b = compl.shift_hue(-spread)
+        a = compl.shift_hue(stepsize/2)
+        b = compl.shift_hue(-stepsize/2)
         return a.join(b)
 
 
-    def compound(self,spread=40, bias=0):
-        ''' the weird K-shaped one with a complement and two analogues that are shifted towards each other '''
-        root_v1  = self.shift_hue(spread)
+    def generate_compound(self, stepsize=40, bias=0):
+        root_v1  = self.shift_hue(stepsize)
 
         compl    = self.complement().shift_hue(bias)
-        compl_v1 = compl.shift_hue(-spread)
+        compl_v1 = compl.shift_hue(-stepsize)
         return root_v1.join(compl,compl_v1)
 
 
 
 
-    def apply_role(self, role):
+    def apply_role(self, role, seed=None):
         if role == Role.DEEP_BASE:
-            out = self.set_random_lightness(min_lightness=0.2, max_lightness=0.25)
-            out = out.set_random_chroma(min_chroma=0.01, max_chroma=0.1)
+            out = self.set_random_lightness(min=0.2, max=0.25, seed=seed)
+            out = out.set_random_chroma(min=0.01, max=0.1, seed=seed)
             return out
 
         elif role == Role.MID_SUPPORT:
-            out = self.set_random_lightness(min_lightness=0.35, max_lightness=0.50)
-            out = out.set_random_chroma(min_chroma=0.1, max_chroma=0.15)
+            out = self.set_random_lightness(min=0.35, max=0.50, seed=seed)
+            out = out.set_random_chroma(min=0.1, max=0.15, seed=seed)
             return out
 
         elif role == Role.SECOND_ACCENT:
-            out = self.set_random_lightness(min_lightness=0.6, max_lightness=0.8)
-            out = out.set_random_chroma(min_chroma=0.15, max_chroma=0.25)
+            out = self.set_random_lightness(min=0.6, max=0.8, seed=seed)
+            out = out.set_random_chroma(min=0.15, max=0.25, seed=seed)
             return out
 
         elif role == Role.HERO_ACCENT:
-            out = self.set_random_lightness(min_lightness=0.8, max_lightness=0.95)
-            out = out.set_random_chroma(min_chroma=0.25, max_chroma=0.4)
+            out = self.set_random_lightness(min=0.8, max=0.925, seed=seed)
+            out = out.set_random_chroma(min=0.25, max=0.3, seed=seed)
+            return out
+
+        elif role == Role.VIBANT_ACCENT:
+            out = self.set_random_lightness(min=0.8, max=0.95, seed=seed)
+            out = out.set_random_chroma(min=0.35, max=0.45, seed=seed)
             return out
 
         elif role == Role.HIGHLIGHT:
-            out = self.set_random_lightness(min_lightness=0.9, max_lightness=.95)
-            out = out.set_random_chroma(min_chroma=0.01, max_chroma=0.1)
+            out = self.set_random_lightness(min=0.9, max=.95, seed=seed)
+            out = out.set_random_chroma(min=0.01, max=0.1, seed=seed)
             return out
 
         return self
 
-    def apply_roles(self, roles):
+
+
+    def apply_roles(self, roles, seed=None):
         out = []
         for i in range(len(self.colors)):
+            # if we have a seed use it otherwise pass None
+            seed = None if seed == None else seed+i
             color = self[i]
-            color = color.apply_role(roles[i])
+            color = color.apply_role(roles[i],seed=seed)
             out.append(color)
         return self.merge(*out)
 
 
 
-
-
-
-    #def shift_chroma(self,offset):
-    #    fn = lambda color: (color[0], min(1,max(0,color[1])) + offset, color[2])
-    #    return OKLCHPalette(self.map(fn))
 
 
 
@@ -940,6 +907,15 @@ class OKLABPalette(ColorPalette):
     def to_srgb(self):
         return self.to_rgb().to_srgb()
 
+
+    def set_lightness(self,lightness):
+        ''' overwrites lightness with scalar or sequence'''
+        fn = lambda c,x: (x,c[1],c[2])
+        return self._map2(lightness,fn)
+
+    def linearize_lightness(self, min=0.2, max=0.9):
+        lightness = np.linspace(min, max, len(self.colors))
+        return self.set_lightness(lightness)
 
 
 
@@ -1114,7 +1090,7 @@ def plot_colors_hsv(palette, out_file=None):
 
 
 
-def plot_colors_oklch(palette, out_file=None, draw_lines=True):
+def plot_colors_oklch(palette, out_file=None, draw_lines=True, show=False):
 
     def oklch_to_rgb_vectorized(L_array, C_array, H_array):
         scalar_converter = lambda l, c, h: ColorUtils.oklch_to_rgb((l, c, h))
@@ -1200,45 +1176,6 @@ def plot_colors_oklch(palette, out_file=None, draw_lines=True):
             dpi=300
         )
 
-    plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# TODO make nice
-def showPalettes(*palettes):
-
-    fig = plt.figure()
-    size = 20
-    ax = fig.add_subplot(111)
-    for y, p in enumerate(palettes):
-        if p.name != None:
-            matplotlib.pyplot.text(p.colors.shape[0] * size, 300 - y * size,
-                                   p.name)
-
-        p = p.to_hex()
-        for x, c in enumerate(p):
-            pos = (x * size, 300 - y * size)
-            rect = matplotlib.patches.Rectangle(pos, size, size, color=c)
-            ax.add_patch(rect)
-
-    plt.xlim([-0, 400])
-    plt.ylim([-0, 400])
-    plt.show()
+    if show: plt.show()
 
 
