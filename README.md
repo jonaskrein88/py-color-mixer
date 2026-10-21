@@ -1,5 +1,5 @@
 # py-color-mixer
-Python utility to procedurally generate and process usable artistic color palettes. No AI just math.
+### Python utility to procedurally generate and process usable artistic color palettes. No AI, just math.
 
 A collection of color math functions to procedurally create color palettes. It is an iteration on a Python script for Substance Designer I wrote for my [procedural graffiti generator](https://www.artstation.com/artwork/DvVJNG) and yields much better results.
 
@@ -8,8 +8,8 @@ It is mostly build around the [OKLCH](https://oklch.com) color space to create p
 The palettes are built on Numpy and all operations work on whole color palettes. Even single colors are implemented as color palettes.
 
 ## usage
-To make sure our colors don't compete with one another we can assign explicit roles to them. 
-Example palette based on a (slightly shifted) split complement harmony.
+To make sure the colors don't compete with one another we can assign explicit roles to them. 
+Example palette based on a split-complement harmony.
 ```python
 roles = [
   Role.DEEP_BASE,
@@ -39,14 +39,14 @@ Aapplying the roles sets the lightness and chroma accordingly, so that we get a 
 ![example](images/analogous_palette_examples.svg)
 ![example](images/analogous_palette_wheel.png)
 
-## Color Vision deficency emulation
+## Color Vision Deficency Emulation
 You can quickly check you palettes against the most common types of color vision deficiency.
 - Protanopia / Protanomaly(50%)
 - Deuteranopia / Deuteranomaly (50%)
 - Tritanopia / Tritanomaly (50%)
 
 The full severity transformations are taken straight from colour-science, the 50% severities are estimates.
-I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) directly, just to be sure.
+I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) directly, if you need to be exact.
 
 A square harmony palette with and without protanopia emulation:
 
@@ -68,11 +68,8 @@ Example from my [Unity dithering project](https://www.artstation.com/artwork/dyA
 
 ![example](images/smooth_palette_example.png)
 
-
-vecteezy.com/free-vector/corporate
-
-vecteezy.com/free-vector/leopard
-
-vecteezy.com/free-vector/floral
-
+## attributions:
+vecteezy.com/free-vector/corporate, 
+vecteezy.com/free-vector/leopard, 
+vecteezy.com/free-vector/floral, 
 freevector.com/geometric-poster-98922
