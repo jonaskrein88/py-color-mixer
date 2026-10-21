@@ -23,7 +23,7 @@ root   = OKLCHPalette.new_random(1,seed=None)  # -> palette of size 1
 splits = root.split_complement(bias=30)        # -> palette of size 2
 
 colors = ( 
-  OKLCHPalette.merge(root, root, sc, root) # -> palette of size 5
+  OKLCHPalette.merge(root, root, splits, root) # -> palette of size 5
   .apply_roles(roles)
   .make_srgb_safe()   # prettier than clipping, just in case we went out of gamut along the way
 )
