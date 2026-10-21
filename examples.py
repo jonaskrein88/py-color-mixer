@@ -107,13 +107,11 @@ def pretty_preview(*palettes, image_width=None, out_file=None, show=True):
 
 
 def recolor_svg(input_svg_path, output_svg_path, fill_colors):
-    # Map normalized 6-digit lower-case hex strings to your index requirements
     COLOR_MAP = {'#ff0000': 0, '#00ff00': 1, '#0000ff': 2, '#00ffff': 3, '#ff00ff': 4, '#ffff00': 5}
     
     tree = ET.parse(input_svg_path)
     root = tree.getroot()
-    
-    # Configure required namespaces
+
     for prefix, uri in [('', "http://www.w3.org/2000/svg"), ('xlink', "http://www.w3.org/1999/xlink")]:
         ET.register_namespace(prefix, uri)
 
@@ -125,7 +123,6 @@ def recolor_svg(input_svg_path, output_svg_path, fill_colors):
             match = re.search(r'(?:^|;)\s*fill\s*:\s*([^;! \s]+)', style_str)
             raw_color = (match.group(1) if match else elem.get('fill', '')).lower()
 
-            # Expand 3-digit short hex formats (e.g., #f00 -> #ff0000)
             if re.match(r'^#[0-9a-f]{3}$', raw_color):
                 raw_color = '#' + ''.join(c * 2 for c in raw_color[1:])
 
@@ -146,7 +143,7 @@ def recolor_svg(input_svg_path, output_svg_path, fill_colors):
 
 
 
-
+# decorator for previews
 def create_previews(file):
 	def _decorator(f):
 		def _wrapper(*args):
