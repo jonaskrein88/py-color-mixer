@@ -40,17 +40,22 @@ Aapplying the roles sets the lightness and chroma accordingly, so that we get a 
 ![example](images/analogous_palette_wheel.png)
 
 ## Color Vision deficency emulation
-I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) module but you can quickly check you palettes against the most common types of color vision deficiency.
+You can quickly check you palettes against the most common types of color vision deficiency.
 - Protanopia / Protanomaly(50%)
 - Deuteranopia / Deuteranomaly (50%)
 - Tritanopia / Tritanomaly (50%)
 
 The full severity transformations are taken straight from colour-science, the 50% severities are estimates.
+I would recommend using the [colour-science](https://colour.readthedocs.io/en/develop/) directly, just to be sure.
 
 A square harmony palette with and without protanopia emulation:
 
 ![colors_vs_protanopia](images/square_vs_protanopia.png)
+
+The original example:
 ![square_example](images/square_example.svg)
+
+and with protanopia emulation:
 ![square_example_vs_protanopia](images/square_protanopia_example.svg)
 
 
